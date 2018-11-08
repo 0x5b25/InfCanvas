@@ -48,18 +48,18 @@ namespace CanvasApp
             this.Content = l;
 
             info = new Label();
-            AbsoluteLayout.SetLayoutBounds(info, new Rectangle(0, 0, 1, 16));
+            AbsoluteLayout.SetLayoutBounds(info, new Rectangle(0, 0, 1, 20));
             AbsoluteLayout.SetLayoutFlags(info, AbsoluteLayoutFlags.WidthProportional);
             l.Children.Add(info);
-            info.Text = "C:"+canvas.CanvasSize+" X:"+this.Width + ","+this.Height;
+            
 
             info2 = new Label();
-            AbsoluteLayout.SetLayoutBounds(info2, new Rectangle(0, 16, 1, 16));
+            AbsoluteLayout.SetLayoutBounds(info2, new Rectangle(0, 20, 1, 20));
             AbsoluteLayout.SetLayoutFlags(info2, AbsoluteLayoutFlags.WidthProportional);
             l.Children.Add(info2);
 
             info3 = new Label();
-            AbsoluteLayout.SetLayoutBounds(info3, new Rectangle(0, 32, 1, 16));
+            AbsoluteLayout.SetLayoutBounds(info3, new Rectangle(0, 40, 1, 20));
             AbsoluteLayout.SetLayoutFlags(info3, AbsoluteLayoutFlags.WidthProportional);
             l.Children.Add(info3);
 
@@ -71,6 +71,7 @@ namespace CanvasApp
 
         private void Canvas_Touch(object sender, SKTouchEventArgs e)
         {
+            info.Text = "C:" + canvas.CanvasSize + " X:" + this.Width + "Y:" + this.Height;
             if (info2 != null) {
                 info2.Text = "Position:" + e.Location;
             }
