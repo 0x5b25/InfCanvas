@@ -24,13 +24,65 @@ namespace CanvasApp.Types
         //internal int depth;
         internal SKColor _getPixel(int x, int y, int depth)
         {
-            if(depth == 1)
+            if (depth == 1)
             {
                 int i = _pixelIndex(x, y);
                 if (i >= 0 && i < _pixels.Length)
-                    return _pixels[i];
+                {
+                    if (_pixels == null)
+                    {
+                        //Scale
+                        /*             -------------------
+                         *  -------    | chunk0 | chunk1 |
+                         *  | SRC | -> |--------|--------|
+                         *  -------    | chunk2 | chunk3 |
+                         *             -------------------
+                         */
+                        SKColor Aver(SKColor p0, SKColor p1, SKColor p2, SKColor p3)
+                        {
+                            return new SKColor(
+                                (byte)((p0.Alpha + p1.Alpha + p2.Alpha + p3.Alpha) >> 2),
+                                (byte)((p0.Red + p1.Red + p2.Red + p3.Red) >> 2),
+                                (byte)((p0.Blue + p1.Blue + p2.Blue + p3.Blue) >> 2),
+                                (byte)((p0.Alpha + p1.Alpha + p2.Alpha + p3.Alpha) >> 2)
+                                );
+                        }
+
+                        int xcenter = TreeDefs.ChunkWidth / 2;
+                        int ycenter = TreeDefs.ChunkHeight / 2;
+                        int tx, ty;
+                        ScalablePixelTreeNode n;
+                        int index = y * TreeDefs.ChunkWidth;
+                        if (y >= ycenter)
+                        {
+                            ty = (y - ycenter) * 2;
+                            //Chunk 2
+                            if (x < xcenter) {tx = x * 2;n = bl;}
+                            //Chunk 3
+                            else{tx = (x - xcenter) * 2; n = br;}
+                        }
+                        else
+                        {
+                            ty = y * 2;
+                            //Chunk 0
+                            if (x < xcenter) { tx = x * 2; n = tl; }
+                            //Chunk 3
+                            else { tx = (x - xcenter) * 2; n = tr; }
+                        }
+                        return Aver(
+                            n._getPixel(tx,     ty,     1),
+                            n._getPixel(tx + 1, ty,     1),
+                            n._getPixel(tx,     ty + 1, 1),
+                            n._getPixel(tx + 1, ty + 1, 1)
+                            );
+
+                    }
+                    else return _pixels[i];
+                }
                 return SKColors.Transparent;
-            }else if(depth > 1)
+
+            }
+            else if (depth > 1)
             {
                 SKColor get()
                 {
@@ -44,9 +96,9 @@ namespace CanvasApp.Types
                         return _pixels[i];
                     return SKColors.Transparent;
                 }
-                if(x >= 0)
+                if (x >= 0)
                 {
-                    if(y >= 0)
+                    if (y >= 0)
                     {
                         //tr
                         if (tr == null) return get();
