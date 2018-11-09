@@ -28,7 +28,7 @@ namespace CanvasApp
 
             vp = Viewport.Get();
             vp.SetupRendererThread(canvas);
-            vp.Resize((int)this.Width, (int)this.Height);
+            //vp.Resize((int)this.Width, (int)this.Height);
 
         }
 
@@ -67,6 +67,7 @@ namespace CanvasApp
             AbsoluteLayout.SetLayoutFlags(canvas, AbsoluteLayoutFlags.All);
             l.Children.Add(canvas);
 
+            //vp.Resize((int)canvas.CanvasSize.Width, (int)canvas.CanvasSize.Height);
         }
 
         private void Canvas_Touch(object sender, SKTouchEventArgs e)
@@ -102,6 +103,8 @@ namespace CanvasApp
                 }
             }/**/
             //vp.Fill();
+            if(vp.buffer == null)
+                vp.Resize((int)canvas.CanvasSize.Width, (int)canvas.CanvasSize.Height);
             args.Surface.Canvas.DrawBitmap(vp.buffer,0,0);
         }
 
@@ -112,7 +115,8 @@ namespace CanvasApp
 
         private void ContentPage_SizeChanged(object sender, EventArgs e)
         {
-            Viewport.Get().Resize((int)this.Width, (int)this.Height);
+            vp.Resize((int)canvas.CanvasSize.Width, (int)canvas.CanvasSize.Height);
+            //Viewport.Get().Resize((int)this.Width, (int)this.Height);
             //canvas?.InvalidateSurface();
         }
     }
