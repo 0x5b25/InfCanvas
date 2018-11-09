@@ -4,8 +4,8 @@
              xmlns:local="clr-namespace:CanvasApp"
              xmlns:sk="clr-namespace:SkiaSharp;assembly=SkiaSharp"
              
-             x:Class="CanvasApp.MainPage"
-             SizeChanged="ContentPage_SizeChanged">
+             x:Class="CanvasApp.MainPage">
+    <!--="ContentPage_SizeChanged"-->
 
     <StackLayout>
         <!-- Place new controls here -->

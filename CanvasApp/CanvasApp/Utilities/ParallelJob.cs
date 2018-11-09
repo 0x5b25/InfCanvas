@@ -10,13 +10,13 @@ namespace CanvasApp.Utilities
         static ParallelJobManager _self = new ParallelJobManager();
         public static ParallelJobManager Get() { return _self; }
 
-        private readonly object _cv = new object();
         private bool _workerRun = true;
         private CountdownEvent _allStop, _workDone;
         private Action<int, int> _job;
 
         //------------------Manager thread-------------------
         Utilities.Queue<Tuple<Action<int, int>,ManualResetEventSlim>> _jobs = new Queue<Tuple<Action<int, int>, ManualResetEventSlim>>();
+        List<Tuple<Thread, ManualResetEventSlim>> _workers = new List<Tuple<Thread, ManualResetEventSlim>>();
         ManualResetEventSlim _notifyNewJob = new ManualResetEventSlim(false);
         Thread _man;
         bool _manRun = true;
@@ -33,9 +33,8 @@ namespace CanvasApp.Utilities
                 //New job got
                 var j = _jobs.Pop();
                 ManualResetEventSlim finishFlag = j.Item2;
-                Action<int, int> job = j.Item1;
+                _job = j.Item1;
                 //Execute job
-                _job = job;
                 if(_workDone == null)
                 {
                     //No worker thread, start 4 workers
@@ -54,6 +53,7 @@ namespace CanvasApp.Utilities
 
         ParallelJobManager() {
             _man = new Thread(ManagerThread);
+            _man.Name = "ParallelJobMan";
             _man.Start();
         }
 
@@ -64,7 +64,7 @@ namespace CanvasApp.Utilities
         {
             lock (_wait)
             {
-                if(waitingWorkers == _workDone.InitialCount - 1)
+                if(waitingWorkers >= _workDone.InitialCount - 1)
                 {
                     //The last worker to be synced
                     waitingWorkers = 0;
@@ -81,7 +81,6 @@ namespace CanvasApp.Utilities
         {
             if (job != null)
             {
-                
                 using (var flag = new ManualResetEventSlim(false))
                 {
                     //Add to queue
@@ -113,66 +112,71 @@ namespace CanvasApp.Utilities
             if (!_workerRun || _job == null)
                 return;
 
-            //lock cv in case some threads may run before all workers aer notified
-            lock (_cv)
-                Monitor.PulseAll(_cv);
-
+            //Dispatch workers
+            foreach(var w in _workers)
+            {
+                //Release the lock on the corresponding worker
+                w.Item2.Set();
+            }
+            //Wait for all workers to return
             _workDone.Wait();
             _workDone.Reset();
-
         }
 
         public void StopAll()
         {
             //There are no previously started workers
             if (_allStop == null) return;
-
-            _workerRun = false;
-            //lock (_cv)
-                Monitor.PulseAll(_cv);
+            foreach (var w in _workers)
+            {
+                //Release the lock on the corresponding worker
+                w.Item2.Set();
+            }
             //Wait for all workers to exit
             _allStop.Wait();
+            //Clear registery
+            _workers.Clear();
+            //Release resources
             _allStop.Dispose();
             _workDone.Dispose();
             _allStop = _workDone = null;
             _job = null;
         }
 
-        public int StartWorkers(int num)
+        public void StartWorkers(int num)
         {
             StopAll();
-            int cycles = 0;
             _allStop = new CountdownEvent(num);
             _workDone = new CountdownEvent(num);
 
             //Thread initialization
             for (int i = 0; i < num; i++)
             {
+                //Buffer worker index
                 int index = i;
-                Thread t = new Thread(() => { Worker(index); });
-                t.Start();
-
-                while (true)
+                //Create a locker
+                ManualResetEventSlim e = new ManualResetEventSlim(false);
+                //Create the worker
+                Thread t = new Thread(() => { Worker(index, e); })
                 {
-                    if (t.ThreadState == ThreadState.WaitSleepJoin)
-                        break;
-                    cycles++;
-                }
+                    Name = "Worker " + index
+                };
+                //Regisrer worker
+                _workers.Add(new Tuple<Thread, ManualResetEventSlim>(t, e));
+                //Start worker
+                t.Start();
             }
-            return cycles;
         }
 
-        private void Worker(int index)
+        private void Worker(int index, ManualResetEventSlim locker)
         {
             //Thread initialize
             while (true)
             {
-                //Wait until initialization is done
-                
-                lock (_cv)
-                {
-                    Monitor.Wait(_cv);
-                }
+                //Wait until initialization is done or job is assigned
+                locker.Wait();
+                //Pause and wait after 1 loop
+                locker.Reset();
                 if (_workerRun)
                 {
                     _job.Invoke(index, _allStop.InitialCount);//Thread.Sleep(3000);
@@ -188,7 +192,9 @@ namespace CanvasApp.Utilities
         {
             _manRun = false;
             StopAll();
-            ((IDisposable)_allStop).Dispose();
+            _allStop.Dispose();
+            _workDone.Dispose();
+            _self = null;
         }
     }
 }
