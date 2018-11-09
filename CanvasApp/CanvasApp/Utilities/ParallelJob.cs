@@ -53,6 +53,7 @@ namespace CanvasApp.Utilities
 
         ParallelJobManager() {
             _man = new Thread(ManagerThread);
+            _man.Name = "ParallelJobMan";
             _man.Start();
         }
 
@@ -156,7 +157,10 @@ namespace CanvasApp.Utilities
                 //Create a locker
                 ManualResetEventSlim e = new ManualResetEventSlim(false);
                 //Create the worker
-                Thread t = new Thread(() => { Worker(index,e); });
+                Thread t = new Thread(() => { Worker(index, e); })
+                {
+                    Name = "Worker " + index
+                };
                 //Regisrer worker
                 _workers.Add(new Tuple<Thread, ManualResetEventSlim>(t, e));
                 //Start worker
@@ -190,6 +194,7 @@ namespace CanvasApp.Utilities
             StopAll();
             _allStop.Dispose();
             _workDone.Dispose();
+            _self = null;
         }
     }
 }

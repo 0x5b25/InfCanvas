@@ -7,10 +7,18 @@ namespace CanvasApp
 {
     public partial class App : Application
     {
+        Action exit;
+
+        public App(Action exitMethod)
+        {
+            InitializeComponent();
+            exit = exitMethod;
+            MainPage = new MainPage();
+        }
+
         public App()
         {
             InitializeComponent();
-
             MainPage = new MainPage();
         }
 
@@ -27,6 +35,11 @@ namespace CanvasApp
         protected override void OnResume()
         {
             // Handle when your app resumes
+        } 
+
+        public void Exit()
+        {
+            exit?.Invoke();
         }
     }
 }
