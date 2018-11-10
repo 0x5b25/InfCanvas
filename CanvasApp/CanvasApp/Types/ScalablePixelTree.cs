@@ -45,8 +45,8 @@ namespace CanvasApp.Types
             SKColor Aver(SKColor p0, SKColor p1, SKColor p2, SKColor p3)
             {
                 return new SKColor(
-                    (byte)((p0.Alpha + p1.Alpha + p2.Alpha + p3.Alpha) >> 2),
                     (byte)((p0.Red + p1.Red + p2.Red + p3.Red) >> 2),
+                    (byte)((p0.Green + p1.Green + p2.Green + p3.Green) >> 2),
                     (byte)((p0.Blue + p1.Blue + p2.Blue + p3.Blue) >> 2),
                     (byte)((p0.Alpha + p1.Alpha + p2.Alpha + p3.Alpha) >> 2)
                     );
@@ -523,58 +523,6 @@ namespace CanvasApp.Types
             }
             if (d > 1) AddDepth(d - 1);
         }
-
-        //Slice chunk into 4 pieces without scaling up
-//         void Slice(int index, int num, SKColor[][] dst)
-// 
-//         {
-//             /*
-//              *             ---------------------------
-//              *             |  chunk0    |    chunk1  |
-//              *             |   ---------|---------   |
-//              *  -------    |   |  src   |  src   |   |
-//              *  | SRC | -> |---|--------|--------|---|
-//              *  -------    |   |  src   |  src   |   |
-//              *             |   ---------|---------   |
-//              *             |  chunk2    |    chunk3  |
-//              *             ---------------------------
-//              */
-// 
-//             int xcenter = TreeDefs.ChunkWidth / 2;
-//             int ycenter = TreeDefs.ChunkHeight / 2;
-// 
-//             for (int y = index; y < TreeDefs.ChunkHeight; y += num)
-//             {
-//                 int x = y * TreeDefs.ChunkWidth;
-//                 if (y >= ycenter)
-//                 {
-//                     //Chunk 2
-// 
-//                     for (int t = (y - ycenter) * TreeDefs.ChunkWidth + xcenter; x < xcenter; x++, t ++)
-//                     {
-//                         dst[2][t] = root._pixels[x];
-//                     }
-//                     //Chunk 3
-//                     for (int t = (y - ycenter) * TreeDefs.ChunkWidth ; x < TreeDefs.ChunkWidth; x++, t++)
-//                     {
-//                         dst[3][t] = root._pixels[x];
-//                     }
-//                 }
-//                 else
-//                 {
-//                     //Chunk 0
-//                     for (int t = (y+ycenter) * TreeDefs.ChunkWidth + xcenter; x < xcenter; x++, t ++)
-//                     {
-//                         dst[0][t] = root._pixels[x];
-//                     }
-//                     //Chunk 1
-//                     for (int t = (y + ycenter) * TreeDefs.ChunkWidth; x < TreeDefs.ChunkWidth; x++, t ++)
-//                     {
-//                         dst[1][t] = root._pixels[x];
-//                     }
-//                 }
-//             }
-//         }
     }
 
 }
