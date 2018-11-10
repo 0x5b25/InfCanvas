@@ -15,61 +15,104 @@ namespace CanvasApp
         SKCanvasView canvas;
         Viewport vp;
 
-        Label info,info2,info3;
+        Label info,info2,info3,info4;
+        Button b, b2, b3, b4;
 
         public MainPage()
         {
             InitializeComponent();
 
-            canvas = new SKCanvasView();
-            canvas.PaintSurface += Repaint;
-            canvas.HorizontalOptions = LayoutOptions.Fill;
-            canvas.VerticalOptions = LayoutOptions.Fill;
+//             canvas = new SKCanvasView();
+//             canvas.PaintSurface += Repaint;
+//             canvas.HorizontalOptions = LayoutOptions.Fill;
+//             canvas.VerticalOptions = LayoutOptions.Fill;
 
             vp = new Viewport();
-            vp.SetupRendererThread(canvas);
+            vp.posx = -100;
+            vp.posy = -200;
             //vp.Resize((int)this.Width, (int)this.Height);
 
         }
 
         public void Test()
         {
-            if (canvas == null)
-            {
-                canvas = new SKCanvasView();
-                canvas.PaintSurface += Repaint;
-                canvas.HorizontalOptions = LayoutOptions.Fill;
-                canvas.VerticalOptions = LayoutOptions.Fill;
-                canvas.SizeChanged += ContentPage_SizeChanged;
-                //canvas.
-            }
+
+            canvas = new SKCanvasView();
+            canvas.PaintSurface += Repaint;
+            canvas.HorizontalOptions = LayoutOptions.Fill;
+            canvas.VerticalOptions = LayoutOptions.Fill;
+            canvas.SizeChanged += ContentPage_SizeChanged;
+            //canvas
+
             canvas.EnableTouchEvents = true;
             canvas.Touch += Canvas_Touch;
             //canvas.
             AbsoluteLayout l = new AbsoluteLayout();
             this.Content = l;
 
-            info = new Label();
+            info = new Label
+            {
+                FontSize = 10,
+                Text = "I_1"
+            };
             AbsoluteLayout.SetLayoutBounds(info, new Rectangle(0, 0, 1, 20));
             AbsoluteLayout.SetLayoutFlags(info, AbsoluteLayoutFlags.WidthProportional);
             l.Children.Add(info);
-            
 
-            info2 = new Label();
+
+            info2 = new Label
+            {
+                FontSize = 10,
+                Text = "I_2"
+            };
             AbsoluteLayout.SetLayoutBounds(info2, new Rectangle(0, 20, 1, 20));
             AbsoluteLayout.SetLayoutFlags(info2, AbsoluteLayoutFlags.WidthProportional);
             l.Children.Add(info2);
 
-            info3 = new Label();
+            info3 = new Label
+            {
+                FontSize = 10,
+                Text = "I_3"
+            };
             AbsoluteLayout.SetLayoutBounds(info3, new Rectangle(0, 40, 1, 20));
             AbsoluteLayout.SetLayoutFlags(info3, AbsoluteLayoutFlags.WidthProportional);
             l.Children.Add(info3);
 
+            info4 = new Label
+            {
+                FontSize = 10,
+                Text = "I_4"
+            };
+            AbsoluteLayout.SetLayoutBounds(info4, new Rectangle(0, 60, 1, 20));
+            AbsoluteLayout.SetLayoutFlags(info4, AbsoluteLayoutFlags.WidthProportional);
+            l.Children.Add(info4);
+
             AbsoluteLayout.SetLayoutBounds(canvas, new Rectangle(0.5, 0.5, 1, 1));
             AbsoluteLayout.SetLayoutFlags(canvas, AbsoluteLayoutFlags.All);
             l.Children.Add(canvas);
+            vp.SetupRendererThread(canvas);
 
+            b = new Button
+            {
+                Text = "+"
+            };
+            b.Pressed += (object sender,EventArgs e) => { if(vp.depth <= 6) vp.depth++; };
+            AbsoluteLayout.SetLayoutBounds(b, new Rectangle(0, 60, 40, 40));
+            AbsoluteLayout.SetLayoutFlags(b, AbsoluteLayoutFlags.None);
+            l.Children.Add(b);
+
+            b2 = new Button
+            {
+                Text = "-"
+            };
+            b2.Pressed += (object sender, EventArgs e) => { if (vp.depth > 0) vp.depth--; };
+            AbsoluteLayout.SetLayoutBounds(b2, new Rectangle(40, 60, 40, 40));
+            AbsoluteLayout.SetLayoutFlags(b2, AbsoluteLayoutFlags.None);
+            l.Children.Add(b2);
+
+            
             //vp.Resize((int)canvas.CanvasSize.Width, (int)canvas.CanvasSize.Height);
+            //RefreshBufferRes();
         }
 
         private void Canvas_Touch(object sender, SKTouchEventArgs e)
@@ -80,8 +123,11 @@ namespace CanvasApp
             }
             if (info3 != null)
             {
-                info3.Text = "Type:" + e.ActionType +"Contact:"+ e.InContact;
-                
+                info3.Text = "Type:" + e.ActionType +" Contact:"+ e.InContact;
+            }
+            if(info4 != null)
+            {
+                info4.Text = "vp.depth:" + vp.depth;
             }
             if (e.MouseButton == SKMouseButton.Left||
                 e.ActionType == SKTouchAction.Pressed||
@@ -89,6 +135,7 @@ namespace CanvasApp
             {
                 //vp.SetPixelBack(Convert.ToInt32(e.Location.X), Convert.ToInt32(e.Location.Y), SKColors.Red);
                 //canvas.InvalidateSurface();
+                if(e.InContact)
                 vp.AddPoint(Convert.ToInt32(e.Location.X/scaleX), Convert.ToInt32(e.Location.Y/scaleY));
             }
 
@@ -124,6 +171,7 @@ namespace CanvasApp
         SKRect bmpRect = new SKRect();
         void RefreshBufferRes()
         {
+            //if (canvas == null) return;
             scaleX = (float)(canvas.CanvasSize.Width / Width);
             scaleY = (float)(canvas.CanvasSize.Height / Height);
             bmpRect.Left = 0;

@@ -5,6 +5,11 @@ using System.Threading;
 
 namespace CanvasApp.Utilities
 {
+    class JobManDefs
+    {
+        public static readonly int workerNum = 4; 
+    }
+
     class ParallelJobManager:IDisposable
     {
         static ParallelJobManager _self = new ParallelJobManager();
@@ -38,7 +43,7 @@ namespace CanvasApp.Utilities
                 if(_workDone == null)
                 {
                     //No worker thread, start 4 workers
-                    StartWorkers(4);
+                    StartWorkers(JobManDefs.workerNum);
                 }
                 DoOnce();
                 //All worker threads returned

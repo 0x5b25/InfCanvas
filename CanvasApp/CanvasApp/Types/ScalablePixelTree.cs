@@ -10,130 +10,210 @@ namespace CanvasApp.Types
         public static readonly int ChunkHeight = 400;
     }
 
-    /*     y+
-     *  tl | tr
-     * ----0---- x+
+    /*     
      *  bl | br
+     * ----0---- x+
+     *  tl | tr
+     *     y+
+     * -------------   
+     * | 0,0 | w,0 |
+     * |---- 0---- x+
+     * | 0,h | w,h |
+     * ---- y+ -----
      */
 
     class ScalablePixelTreeNode
     {
-        internal SKColor[] _pixels /*= new SKColor[TreeDefs.ChunkWidth*TreeDefs.ChunkHeight]*/;
+        internal SKColor[,] _pixels /*= new SKColor[TreeDefs.ChunkWidth*TreeDefs.ChunkHeight]*/;
         internal ScalablePixelTreeNode tl, tr, bl, br;
         internal ScalablePixelTreeNode parent;
         //internal int depth;
-        internal SKColor _getPixel(int x, int y, int depth)
+        int _Xref(int depth) {  return (TreeDefs.ChunkWidth << depth) >> 3; }
+        int _Yref(int depth) { return (TreeDefs.ChunkHeight << depth) >> 3; }
+
+        SKColor _GetPixelFromChild(int x, int y)
         {
-            if(depth == 1)
+            if (tr == null) return SKColors.Transparent;
+
+            //Scale
+            /*             -------------------
+             *  -------    | chunk3 | chunk2 |
+             *  | SRC | -> |--------|--------|
+             *  -------    | chunk1 | chunk0 |
+             *             -------------------
+             */
+            SKColor Aver(SKColor p0, SKColor p1, SKColor p2, SKColor p3)
             {
-                int i = _pixelIndex(x, y);
-                if (i >= 0 && i < _pixels.Length)
-                    return _pixels[i];
-                return SKColors.Transparent;
-            }else if(depth > 1)
+                return new SKColor(
+                    (byte)((p0.Alpha + p1.Alpha + p2.Alpha + p3.Alpha) >> 2),
+                    (byte)((p0.Red + p1.Red + p2.Red + p3.Red) >> 2),
+                    (byte)((p0.Blue + p1.Blue + p2.Blue + p3.Blue) >> 2),
+                    (byte)((p0.Alpha + p1.Alpha + p2.Alpha + p3.Alpha) >> 2)
+                    );
+            }
+
+            //Find out sector
+            int xcenter = TreeDefs.ChunkWidth / 2;
+            int ycenter = TreeDefs.ChunkHeight / 2;
+            int tx, ty;
+            ScalablePixelTreeNode n;
+            int index = y * TreeDefs.ChunkWidth;
+            if (y >= 0)
             {
-                SKColor get()
+                ty = y * 2 - TreeDefs.ChunkHeight / 2;
+                //Chunk 0
+                if (x >= 0) { tx = x * 2 - TreeDefs.ChunkWidth / 2; n = tr; }
+                //Chunk 1
+                else { tx = x * 2 + TreeDefs.ChunkWidth / 2; n = tl; }
+            }
+            else
+            {
+                ty = y * 2 + TreeDefs.ChunkHeight / 2;
+                //Chunk 0
+                if (x >= 0) { tx = x * 2 - TreeDefs.ChunkWidth / 2; n = br; }
+                //Chunk 3
+                else { tx = x * 2 + TreeDefs.ChunkWidth / 2; n = bl; }
+            }
+            return Aver(
+                n._GetPixel(tx, ty, 1),
+                n._GetPixel(tx + 1, ty, 1),
+                n._GetPixel(tx, ty + 1, 1),
+                n._GetPixel(tx + 1, ty + 1, 1)
+                );
+
+        }
+        SKColor _GetPixelFromThis(int x, int y)
+        {
+            return _pixels[x + TreeDefs.ChunkWidth/2, y + TreeDefs.ChunkHeight/2];
+        }
+        internal SKColor _GetPixel(int x, int y, int depth)
+        {
+            if (depth == 1)
+            {
+                //Display chunk boundry check
+
+                if (x >= -TreeDefs.ChunkWidth / 2 && x < TreeDefs.ChunkWidth / 2 &&
+                    y >= -TreeDefs.ChunkHeight / 2 && y < TreeDefs.ChunkHeight / 2)
+                {
+                    if (-x == TreeDefs.ChunkWidth / 2 || x == TreeDefs.ChunkWidth / 2 - 1 ||
+                        -y == TreeDefs.ChunkHeight / 2 || y == TreeDefs.ChunkHeight / 2 - 1)
+                    {
+                        if (_pixels != null)
+                        {
+                            return SKColors.Blue;
+                        }
+                        if (tr != null)
+                            return SKColors.Green;
+                        return SKColors.Red;
+                    }
+                    if (_pixels == null) return _GetPixelFromChild(x, y);
+                    else return _GetPixelFromThis(x,y);
+                }
+                else return SKColors.Transparent;
+
+            }
+            else if(depth > 1)
+            {
+                if (tr == null)
                 {
                     while (depth > 1)
                     {
                         x = x == -1 ? -1 : x / 2; y = y == -1 ? -1 : y / 2;
                         depth--;
                     }
-                    int i = _pixelIndex(x, y);
-                    if (i >= 0 && i < _pixels.Length)
-                        return _pixels[i];
-                    return SKColors.Transparent;
+                    if (_pixels != null)
+                    {
+                        return _GetPixelFromThis(x, y);
+                    }
+                    else return SKColors.Gray;
                 }
-                if(x >= 0)
+
+                int xref = _Xref(depth);
+                int yref = _Yref(depth);
+
+                if (x >= 0)
                 {
-                    if(y >= 0)
-                    {
-                        //tr
-                        if (tr == null) return get();
-                        return tr._getPixel(x - TreeDefs.ChunkWidth / 2, y - TreeDefs.ChunkHeight / 2, depth);
-                    }
-                    else
-                    {
-                        //br
-                        if (br == null) return get();
-                        return br._getPixel(x - TreeDefs.ChunkWidth / 2, y + TreeDefs.ChunkHeight / 2, depth);
-                    }
+                    if(y >= 0) return tr._GetPixel(x - xref, y - yref, depth - 1);
+                    else return br._GetPixel(x - xref, y + yref, depth - 1);
                 }
                 else
                 {
-                    if (y >= 0)
-                    {
-                        //tl
-                        if (tl == null) return get();
-                        return tl._getPixel(x + TreeDefs.ChunkWidth / 2, y - TreeDefs.ChunkHeight / 2, depth);
-                    }
-                    else
-                    {
-                        //bl
-                        if (bl == null) return get();
-                        return bl._getPixel(x + TreeDefs.ChunkWidth / 2, y + TreeDefs.ChunkHeight / 2, depth);
-                    }
+                    if (y >= 0) return tl._GetPixel(x + xref, y - yref, depth - 1);
+                    else return bl._GetPixel(x + xref, y + yref, depth - 1);
                 }
             }
-            
+
             return SKColors.Transparent;
             
         }
-        internal void _setPixel(int x, int y, int depth, SKColor color)
+
+        void _SetPixelInChild(int x, int y, SKColor color)
+        {
+            //Find out which sector to draw on
+            ScalablePixelTreeNode n;
+            int xcoord, ycoord;
+            if (x >= 0)
+            {
+                xcoord = x * 2 - TreeDefs.ChunkWidth / 2;
+                if (y >= 0) { n = tr; ycoord = y * 2 - TreeDefs.ChunkHeight / 2; }
+                else { n = br; ycoord = y * 2 + TreeDefs.ChunkHeight / 2; }
+            }
+            else
+            {
+                xcoord = x * 2 + TreeDefs.ChunkWidth / 2;
+                if (y >= 0) { n = tl; ycoord = y * 2 - TreeDefs.ChunkHeight / 2; }
+                else { n = bl; ycoord = y * 2 + TreeDefs.ChunkHeight / 2; }
+            }
+            n._SetPixel(xcoord, ycoord, 1, color);
+            n._SetPixel(xcoord + 1, ycoord, 1, color);
+            n._SetPixel(xcoord, ycoord + 1, 1, color);
+            n._SetPixel(xcoord + 1, ycoord + 1, 1, color);
+            return;
+        }
+        void _SetPixelInThis(int x, int y, SKColor color)
+        {
+            _pixels[x + TreeDefs.ChunkWidth/2, y + TreeDefs.ChunkHeight/2] = color;
+        }
+        internal void _SetPixel(int x, int y, int depth, SKColor color)
         {
             if (depth == 1)
             {
-                if(_pixels == null)
+                if (x >= -TreeDefs.ChunkWidth / 2 && x < TreeDefs.ChunkWidth / 2 &&
+                    y >= -TreeDefs.ChunkHeight / 2 && y < TreeDefs.ChunkHeight / 2)
                 {
                     if (tl != null)
                     {
-                        //There is a deeper layer
-                        //Find out which sector to draw on
-                        ScalablePixelTreeNode n;
-                        int xcoord, ycoord;
-                        if (x >= 0)
-                        {
-                            xcoord = x*2 - TreeDefs.ChunkWidth / 2;
-                            if (y >= 0) { n = tr; ycoord = y*2 - TreeDefs.ChunkHeight/2; }
-                            else {  n = br; ycoord = y*2 + TreeDefs.ChunkHeight / 2; }
-                        }
-                        else
-                        {
-                            xcoord = x*2 + TreeDefs.ChunkWidth / 2;
-                            if (y >= 0) {  n = tl; ycoord = y *2 - TreeDefs.ChunkHeight / 2; }
-                            else { n = bl; ycoord = y*2 + TreeDefs.ChunkHeight / 2; }
-                        }
-                        n._setPixel(xcoord, ycoord, 1, color);
-                        n._setPixel(xcoord + 1, ycoord, 1, color);
-                        n._setPixel(xcoord, ycoord + 1, 1, color);
-                        n._setPixel(xcoord + 1, ycoord + 1, 1, color);
+                        _SetPixelInChild(x, y, color);
                         return;
                     }
-                    else _pixels = new SKColor[TreeDefs.ChunkWidth * TreeDefs.ChunkHeight];
+                    if (_pixels == null)
+                    {
+                        _pixels = new SKColor[TreeDefs.ChunkWidth , TreeDefs.ChunkHeight];
+                    }
+                    _SetPixelInThis(x, y, color);
+                    return;
                 }
-                int i = _pixelIndex(x, y);
-                if (i >= 0 && i < _pixels.Length)
-                    _pixels[i] = color;
-                return;
             }
             else if (depth > 1)
             {
                 ScalablePixelTreeNode n;
                 int xcoord, ycoord;
-                bool t, r;
+                bool t = false, r = false;
+                //int scaleFactor = depth - 1;
+                int xref = _Xref(depth);
+                int yref = _Yref(depth);
                 if (x >= 0)
                 {
                     r = true;
-                    xcoord = x * 2 - TreeDefs.ChunkWidth / 2;
-                    if (y >= 0) { t = true;/*tr*/ n = tr; ycoord = y *2- TreeDefs.ChunkHeight / 2; }
-                    else { t = false; n = br; ycoord = y*2 + TreeDefs.ChunkHeight / 2; }
+                    xcoord = x - xref;
+                    if (y >= 0) { t = true; n = tr; ycoord = y - yref; }
+                    else { n = br; ycoord = y + yref; }
                 }
                 else
                 {
-                    r = false;
-                    xcoord = x*2 + TreeDefs.ChunkWidth / 2;
-                    if (y >= 0) { t = true; n = tl; ycoord = y *2 - TreeDefs.ChunkHeight / 2; }
-                    else { t = false; n = bl; ycoord = y*2 + TreeDefs.ChunkHeight / 2; }
+                    xcoord = x + xref;
+                    if (y >= 0) {  n = tl; ycoord = y - yref; }
+                    else { n = bl; ycoord = y + yref; }
                 }
                 if (n == null)
                 {
@@ -141,35 +221,37 @@ namespace CanvasApp.Types
                     tr = new ScalablePixelTreeNode() { parent = this };
                     bl = new ScalablePixelTreeNode() { parent = this };
                     br = new ScalablePixelTreeNode() { parent = this };
+                    if (t) { if (r) n = tr; else n = tl; }
+                    else { if (r) n = br; else n = bl; }
                     if (_pixels != null)
                     {
                         //Create new chunks
-                        SKColor[][] dst = new SKColor[4][];
-                        dst[0] = new SKColor[TreeDefs.ChunkWidth * TreeDefs.ChunkHeight];
-                        dst[1] = new SKColor[TreeDefs.ChunkWidth * TreeDefs.ChunkHeight];
-                        dst[2] = new SKColor[TreeDefs.ChunkWidth * TreeDefs.ChunkHeight];
-                        dst[3] = new SKColor[TreeDefs.ChunkWidth * TreeDefs.ChunkHeight];
+                        SKColor[][,] dst = new SKColor[4][,];
+                        dst[0] = new SKColor[TreeDefs.ChunkWidth , TreeDefs.ChunkHeight];
+                        dst[1] = new SKColor[TreeDefs.ChunkWidth , TreeDefs.ChunkHeight];
+                        dst[2] = new SKColor[TreeDefs.ChunkWidth , TreeDefs.ChunkHeight];
+                        dst[3] = new SKColor[TreeDefs.ChunkWidth , TreeDefs.ChunkHeight];
 
                         //Slice this node
-                        Utilities.ParallelJobManager.Get().DoJob((int index, int num) => { Slice(index, num, dst); });
-                        tl._pixels = dst[0]; tr._pixels = dst[1];
-                        bl._pixels = dst[2]; br._pixels = dst[3];
+                        Utilities.ParallelJobManager.Get().DoJob((int index, int num) => { SliceAndScaleUp(index, num, dst); });
+                        tr._pixels = dst[0]; tl._pixels = dst[1];
+                        br._pixels = dst[2]; bl._pixels = dst[3];
                         _pixels = null;
                     }
-
                 }
-                n._setPixel(xcoord, ycoord, depth - 1, color);
+                n._SetPixel(xcoord, ycoord, depth - 1, color);
             }
         }
+
         int _pixelIndex(int x, int y) { return (y+TreeDefs.ChunkHeight/2) * TreeDefs.ChunkWidth + x + TreeDefs.ChunkWidth / 2; }
 
         //Slice chunk into 4 pieces and scale up 2x
-        void Slice(int index, int num, SKColor[][] dst)
+        void SliceAndScaleUp(int index, int num, SKColor[][,] dst)
         {
             /*             -------------------
-             *  -------    | chunk0 | chunk1 |
+             *  -------    | chunk3 | chunk2 |
              *  | SRC | -> |--------|--------|
-             *  -------    | chunk2 | chunk3 |
+             *  -------    | chunk1 | chunk0 |
              *             -------------------
              */
 
@@ -178,43 +260,123 @@ namespace CanvasApp.Types
 
             for (int y = index; y < TreeDefs.ChunkHeight; y += num)
             {
-                int x = y * TreeDefs.ChunkWidth;
                 if (y >= ycenter)
                 {
-                    //Chunk 2
-
-                    for (int t1 = (y - ycenter) * TreeDefs.ChunkWidth * 2,
-                        t2 = t1 + TreeDefs.ChunkWidth; x < xcenter; x++, t1 += 2, t2 += 2)
+                    //Chunk 1
+                    int y1 = (y - ycenter) *  2;
+                    int y2 = y1 + 1;
+                    int x = 0;
+                    for (int x1 = 0; x < xcenter; x++,x1+=2)
                     {
-                        dst[2][t1] = dst[2][t1 + 1] =
-                        dst[2][t2] = dst[2][t2 + 1] = _pixels[x];
+                        dst[1][x1   , y1] = dst[1][x1   , y2] =
+                        dst[1][x1+1 , y1] = dst[1][x1+1 , y2] = _pixels[x,y];
                     }
-                    //Chunk 3
-                    for (int t1 = (y - ycenter) * TreeDefs.ChunkWidth * 2,
-                        t2 = t1 + TreeDefs.ChunkWidth; x < TreeDefs.ChunkWidth; x++, t1 += 2, t2 += 2)
+                    //Chunk 0
+                    for (int x1 = 0; x < TreeDefs.ChunkWidth; x++,x1+=2)
                     {
-                        dst[3][t1] = dst[3][t1 + 1] =
-                        dst[3][t2] = dst[3][t2 + 1] = _pixels[x];
+                        dst[0][x1, y1] = dst[0][x1, y2] =
+                        dst[0][x1 + 1, y1] = dst[0][x1 + 1, y2] = _pixels[x, y];
                     }
                 }
                 else
                 {
-                    //Chunk 0
-                    for (int t1 = y * TreeDefs.ChunkWidth * 2,
-                        t2 = t1 + TreeDefs.ChunkWidth; x < xcenter; x++, t1 += 2, t2 += 2)
+                    //Chunk 3
+                    int y1 = y  * 2;
+                    int y2 = y1 + 1;
+                    int x = 0;
+                    for (int x1 = 0; x < xcenter; x++, x1 += 2)
                     {
-                        dst[0][t1] = dst[0][t1 + 1] =
-                        dst[0][t2] = dst[0][t2 + 1] = _pixels[x];
+                        dst[3][x1, y1] = dst[3][x1, y2] =
+                        dst[3][x1 + 1, y1] = dst[3][x1 + 1, y2] = _pixels[x, y];
                     }
-                    //Chunk 1
-                    for (int t1 = y * TreeDefs.ChunkWidth * 2,
-                        t2 = t1 + TreeDefs.ChunkWidth; x < TreeDefs.ChunkWidth; x++, t1 += 2, t2 += 2)
+                    //Chunk 2
+                    for (int x1 = 0; x < TreeDefs.ChunkWidth; x++, x1 += 2)
                     {
-                        dst[1][t1] = dst[1][t1 + 1] =
-                        dst[1][t2] = dst[1][t2 + 1] = _pixels[x];
+                        dst[2][x1, y1] = dst[2][x1, y2] =
+                        dst[2][x1 + 1, y1] = dst[2][x1 + 1, y2] = _pixels[x, y];
                     }
                 }
             }
+        }
+        void SliceNoScale(int index, int num, SKColor[][,] dst)
+
+        {
+            /*
+             *             ---------------------------
+             *             |  chunk3    |    chunk2  |
+             *             |   ---------|---------   |
+             *  -------    |   |  src   |  src   |   |
+             *  | SRC | -> |---|--------|--------|---|
+             *  -------    |   |  src   |  src   |   |
+             *             |   ---------|---------   |
+             *             |  chunk1    |    chunk0  |
+             *             ---------------------------
+             */
+
+            int xcenter = TreeDefs.ChunkWidth / 2;
+            int ycenter = TreeDefs.ChunkHeight / 2;
+
+            for (int y = index; y < TreeDefs.ChunkHeight; y += num)
+            {
+                if (y >= ycenter)
+                {
+                    int y1 = y - ycenter;
+                    int x = 0;
+                    //Chunk 1
+                    for (; x < xcenter; x++)
+                    {
+                        int x1 = x + xcenter;
+                        
+                        dst[1][x1, y1] = _pixels[x, y];
+                    }
+                    //Chunk 0
+                    for (; x < TreeDefs.ChunkWidth; x++)
+                    {
+                        int x1 = x - xcenter;
+                        dst[0][x1, y1] = _pixels[x, y];
+                    }
+                }
+                else
+                {
+                    //Chunk 3
+                    int y1 = y + ycenter;
+                    int x = 0;
+                    for (; x < xcenter; x++)
+                    {
+                        int x1 = x + xcenter;
+                        dst[3][x1, y1] = _pixels[x, y];
+                    }
+                    //Chunk 2
+                    for (; x < TreeDefs.ChunkWidth; x++)
+                    {
+                        int x1 = x - xcenter;
+                        dst[2][x1, y1]  = _pixels[x, y];
+                    }
+                }
+            }
+        }
+        public void Subdivide()
+        {
+            if (_pixels == null) return;
+
+            tl = new ScalablePixelTreeNode() { parent = this };
+            tr = new ScalablePixelTreeNode() { parent = this };
+            bl = new ScalablePixelTreeNode() { parent = this };
+            br = new ScalablePixelTreeNode() { parent = this };
+
+            //Create new chunks
+            SKColor[][,] dst = new SKColor[4][,];
+            dst[0] = new SKColor[TreeDefs.ChunkWidth, TreeDefs.ChunkHeight];
+            dst[1] = new SKColor[TreeDefs.ChunkWidth, TreeDefs.ChunkHeight];
+            dst[2] = new SKColor[TreeDefs.ChunkWidth, TreeDefs.ChunkHeight];
+            dst[3] = new SKColor[TreeDefs.ChunkWidth, TreeDefs.ChunkHeight];
+
+            //Slice this node
+            Utilities.ParallelJobManager.Get().DoJob((int index, int num) => { SliceNoScale(index, num, dst); });
+            tr._pixels = dst[0]; tl._pixels = dst[1];
+            br._pixels = dst[2]; bl._pixels = dst[3];
+            _pixels = null;
+
         }
     }
 
@@ -225,44 +387,49 @@ namespace CanvasApp.Types
 
         public SKColor GetPixel(int x, int y, int depth)
         {
-            if (root != null) return root._getPixel(x, y, depth);
+            if (root != null) return root._GetPixel(x, y, depth);
             return SKColors.Transparent;
         }
 
         public int SetPixel(int x, int y, int depth, SKColor color)
         {
+            if (root == null)
+            {
+                root = new ScalablePixelTreeNode();
+                totalDepth++;
+            }
             if (depth <= 0)
             {
                 AddDepth(-depth + 1);
                 depth = 1;
             }
             //evaluate boundary
-            int w = depth * TreeDefs.ChunkWidth / 2;
-            int h = depth * TreeDefs.ChunkHeight / 2;
+            int w = depth >= 2 ? TreeDefs.ChunkWidth << (depth - 2) : TreeDefs.ChunkWidth >> 1;
+            int h = depth >= 2 ? TreeDefs.ChunkHeight << (depth - 2) : TreeDefs.ChunkHeight >> 1;
             //additional depth needed
             int reqDepth = 0;
             if (x >= w )
             {
-                reqDepth = x *2 / TreeDefs.ChunkWidth;
+                reqDepth = Utilities.Mathi.Log2(x *2 / TreeDefs.ChunkWidth) - depth + 1;
                 //out of bounds
             }
             else if(x < -w)
             {
-                reqDepth = -x * 2 / TreeDefs.ChunkWidth;
+                reqDepth = Utilities.Mathi.Log2(-x * 2 / TreeDefs.ChunkWidth  ) - depth + 1;
             }
             if (y > h)
             {
-                int r = y * 2 / TreeDefs.ChunkHeight;
+                int r = Utilities.Mathi.Log2(y * 2 / TreeDefs.ChunkHeight  ) - depth + 1;
                 reqDepth = r > reqDepth ? r : reqDepth;
             }
             else if (y < -h)
             {
-                int r = -y * 2 / TreeDefs.ChunkHeight;
+                int r = Utilities.Mathi.Log2(-y * 2 / TreeDefs.ChunkHeight  ) - depth + 1;
                 reqDepth = r > reqDepth ? r : reqDepth;
             }
             //Slice root and add height
             AddDepth(reqDepth);
-            root._setPixel(x, y, depth + reqDepth, color);
+            root._SetPixel(x, y, depth + reqDepth, color);
 
             //Return depth added
             return reqDepth;
@@ -271,12 +438,8 @@ namespace CanvasApp.Types
         void AddDepth(int d)
         {
             if (d <= 0) return;
-            if (root == null)
-            {
-                root = new ScalablePixelTreeNode();
-                totalDepth++;
-            }
-            else
+            
+            //else
             {
                 void Assign(ScalablePixelTreeNode target, ScalablePixelTreeNode pre, int prePos)
                 {
@@ -331,98 +494,87 @@ namespace CanvasApp.Types
                         pre.parent = target;
                     }
                 }
-                ScalablePixelTreeNode n = new ScalablePixelTreeNode();
-                Assign(n, null, 0);
-                if (root.tl == null)
+
+                if (root._pixels != null)
                 {
-                    //No depth
-                    if (root._pixels != null)
-                    {
-                        //need slicing
-
-                        //Create new chunks
-                        SKColor[][] dst = new SKColor[4][];
-                        dst[0] = new SKColor[TreeDefs.ChunkWidth * TreeDefs.ChunkHeight];
-                        dst[1] = new SKColor[TreeDefs.ChunkWidth * TreeDefs.ChunkHeight];
-                        dst[2] = new SKColor[TreeDefs.ChunkWidth * TreeDefs.ChunkHeight];
-                        dst[3] = new SKColor[TreeDefs.ChunkWidth * TreeDefs.ChunkHeight];
-
-                        //Slice this node
-                        Utilities.ParallelJobManager.Get().DoJob((int index, int num) => { Slice(index, num, dst); });
-                        n.tl._pixels = dst[0]; n.tr._pixels = dst[1];
-                        n.bl._pixels = dst[2]; n.br._pixels = dst[3];
-                    }
+                    //need slicing
+                    root.Subdivide();
+                    totalDepth++;
                 }
                 else
                 {
-
-                    //There is depth
-                    //n.tl.br = root.tl;
-                    Assign(n.tl, root.tl, 3);
-                    //n.tr.bl = root.tr;
-                    Assign(n.tr, root.tr, 2);
-                    //n.bl.tr = root.bl;
-                    Assign(n.bl, root.bl, 1);
-                    //n.br.tl = root.br;
-                    Assign(n.br, root.br, 0);
+                    ScalablePixelTreeNode n = new ScalablePixelTreeNode();
+                    Assign(n, null, 0);
+                    if (root.tr != null)
+                    {
+                        //There is depth
+                        //n.tl.br = root.tl;
+                        Assign(n.tl, root.tl, 3);
+                        //n.tr.bl = root.tr;
+                        Assign(n.tr, root.tr, 2);
+                        //n.bl.tr = root.bl;
+                        Assign(n.bl, root.bl, 1);
+                        //n.br.tl = root.br;
+                        Assign(n.br, root.br, 0);
+                    }
+                    root = n;
+                    totalDepth++;
                 }
-                root = n;
-                totalDepth++;
             }
             if (d > 1) AddDepth(d - 1);
         }
 
         //Slice chunk into 4 pieces without scaling up
-        void Slice(int index, int num, SKColor[][] dst)
-
-        {
-            /*
-             *             ---------------------------
-             *             |  chunk0    |    chunk1  |
-             *             |   ---------|---------   |
-             *  -------    |   |  src   |  src   |   |
-             *  | SRC | -> |---|--------|--------|---|
-             *  -------    |   |  src   |  src   |   |
-             *             |   ---------|---------   |
-             *             |  chunk2    |    chunk3  |
-             *             ---------------------------
-             */
-
-            int xcenter = TreeDefs.ChunkWidth / 2;
-            int ycenter = TreeDefs.ChunkHeight / 2;
-
-            for (int y = index; y < TreeDefs.ChunkHeight; y += num)
-            {
-                int x = y * TreeDefs.ChunkWidth;
-                if (y >= ycenter)
-                {
-                    //Chunk 2
-
-                    for (int t = (y - ycenter) * TreeDefs.ChunkWidth + xcenter; x < xcenter; x++, t ++)
-                    {
-                        dst[2][t] = root._pixels[x];
-                    }
-                    //Chunk 3
-                    for (int t = (y - ycenter) * TreeDefs.ChunkWidth ; x < TreeDefs.ChunkWidth; x++, t++)
-                    {
-                        dst[3][t] = root._pixels[x];
-                    }
-                }
-                else
-                {
-                    //Chunk 0
-                    for (int t = (y+ycenter) * TreeDefs.ChunkWidth + xcenter; x < xcenter; x++, t ++)
-                    {
-                        dst[0][t] = root._pixels[x];
-                    }
-                    //Chunk 1
-                    for (int t = (y + ycenter) * TreeDefs.ChunkWidth; x < TreeDefs.ChunkWidth; x++, t ++)
-                    {
-                        dst[1][t] = root._pixels[x];
-                    }
-                }
-            }
-        }
+//         void Slice(int index, int num, SKColor[][] dst)
+// 
+//         {
+//             /*
+//              *             ---------------------------
+//              *             |  chunk0    |    chunk1  |
+//              *             |   ---------|---------   |
+//              *  -------    |   |  src   |  src   |   |
+//              *  | SRC | -> |---|--------|--------|---|
+//              *  -------    |   |  src   |  src   |   |
+//              *             |   ---------|---------   |
+//              *             |  chunk2    |    chunk3  |
+//              *             ---------------------------
+//              */
+// 
+//             int xcenter = TreeDefs.ChunkWidth / 2;
+//             int ycenter = TreeDefs.ChunkHeight / 2;
+// 
+//             for (int y = index; y < TreeDefs.ChunkHeight; y += num)
+//             {
+//                 int x = y * TreeDefs.ChunkWidth;
+//                 if (y >= ycenter)
+//                 {
+//                     //Chunk 2
+// 
+//                     for (int t = (y - ycenter) * TreeDefs.ChunkWidth + xcenter; x < xcenter; x++, t ++)
+//                     {
+//                         dst[2][t] = root._pixels[x];
+//                     }
+//                     //Chunk 3
+//                     for (int t = (y - ycenter) * TreeDefs.ChunkWidth ; x < TreeDefs.ChunkWidth; x++, t++)
+//                     {
+//                         dst[3][t] = root._pixels[x];
+//                     }
+//                 }
+//                 else
+//                 {
+//                     //Chunk 0
+//                     for (int t = (y+ycenter) * TreeDefs.ChunkWidth + xcenter; x < xcenter; x++, t ++)
+//                     {
+//                         dst[0][t] = root._pixels[x];
+//                     }
+//                     //Chunk 1
+//                     for (int t = (y + ycenter) * TreeDefs.ChunkWidth; x < TreeDefs.ChunkWidth; x++, t ++)
+//                     {
+//                         dst[1][t] = root._pixels[x];
+//                     }
+//                 }
+//             }
+//         }
     }
 
 }
