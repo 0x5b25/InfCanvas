@@ -10,23 +10,28 @@ namespace CanvasApp.Utilities
 
         public T Pop()
         {
-            if (_queue.Count <= 0)
-                return null;
-            T val = _queue.First.Value;
-            _queue.RemoveFirst();
-            return val;
+            lock (_queue)
+            {
+                if (_queue.Count <= 0)
+                    return null;
+                T val = _queue.First.Value;
+                _queue.RemoveFirst();
+                return val;
+            }
         }
 
         public void Push(T obj)
         {
-            _queue.AddLast(obj);
+            lock (_queue)
+                _queue.AddLast(obj);
         }
 
         public void Reset()
         {
-            _queue.Clear();
+            lock (_queue)
+                _queue.Clear();
         }
 
-        public int GetDepth() { return _queue.Count; }
+        public int GetDepth() { lock (_queue) return _queue.Count; }
     }
 }

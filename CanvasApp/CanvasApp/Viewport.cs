@@ -4,56 +4,60 @@ using System.Runtime.InteropServices;
 using System.Text;
 using SkiaSharp;
 using System.Threading;
-using System.Threading.Tasks;
+using Xamarin.Forms;
 using SkiaSharp.Views.Forms;
 
 namespace CanvasApp
 {
 
-    class Viewport
+    class Viewport:IDisposable
     {
-        static Viewport _self;
-        public static Viewport Get() { if (_self == null) _self = new Viewport(); return _self; }
+        //static Viewport _self;
+        //public static Viewport Get() { if (_self == null) _self = new Viewport(); return _self; }
 
         public SKBitmap buffer;
         IntPtr _pixels;
 
         float _scale = 1;
+        public int depth = 1;
+        public int posx = 0, posy = 0;
 
         //------------------Test contents-------------------------------
-        byte[] _backPixelBuffer;
-        Types.ScalablePixelTree pixelTree = new Types.ScalablePixelTree();
+        byte[,] _backPixelBuffer;
+        public Types.ScalablePixelTree pixelTree = new Types.ScalablePixelTree();
         Utilities.Queue<Types.TouchPoint> points = new Utilities.Queue<Types.TouchPoint>();
-        Task renderer;
+        Thread renderer;
+        ManualResetEventSlim renlocker = new ManualResetEventSlim(false);
         SKCanvasView canvas;
+        bool _rndManRun;
         void RendererMain()
         {
             while (true)
             {
-                if (buffer != null)
+                renlocker.Wait();
+               
+                if (points.GetDepth() <= 0)
+                    renlocker.Reset();
+
+                if (!_rndManRun) break;
+                while (points.GetDepth() > 0)
                 {
-                    lock (buffer)
+                    //Get a point
+                    Types.TouchPoint p = points.Pop();
+                    if (p.type != SKTouchAction.Cancelled)
                     {
-                        while (points.GetDepth() > 0)
-                        {
-                            //Get a point
-                            Types.TouchPoint p = points.Pop();
-                            if (p.type != SKTouchAction.Cancelled)
-                            {
-                                //Draw point
-                                SetPixelBack(p.x, p.y, SKColors.Red);
-                            }
-                        }
-                        //Render viewport
-                        //fillJob?.DoOnce();
-                        Utilities.ParallelJobManager.Get().DoJob(Fill);
-                        //issue redraw
-                        canvas?.InvalidateSurface();
+                        //Draw point
+                        //SetPixelBack(p.x, p.y, SKColors.Red);
+                        depth += pixelTree.SetPixel(p.x + posx, p.y+posy, depth, SKColors.Red);
                     }
                 }
-                //Pause renderer
-                    lock (points)
-                        Monitor.Wait(points);
+                //Render viewport
+                lock (this)
+                    //Lock viewport during rendering
+                    Utilities.ParallelJobManager.Get().DoJob(FillFromPixelTree);
+                //issue redraw
+                Device.BeginInvokeOnMainThread(() => {canvas?.InvalidateSurface();});
+
             }
         }
 
@@ -66,7 +70,33 @@ namespace CanvasApp
 
                 for (int x = index; x < _backPixelBuffer.Length; x += total)
                 {
-                    p[x] = _backPixelBuffer[x];
+                    //p[x] = _backPixelBuffer[x];
+                }
+            }
+        }
+
+        void FillFromPixelTree(int tindex, int total)
+        {
+            //if (_backPixelBuffer == null) return;
+            unsafe
+            {
+                byte* p = (byte*)_pixels.ToPointer();
+
+                for(int y = tindex; y <height; y += total)
+                {
+                    int pindex = y * width;
+                    for(int x = 0; x < width; x++)
+                    {
+                        //pindex = (pindex + x) * 4;
+                        //SKColor pixel = pixelTree.GetPixel(x, y, depth);
+                        //p[pindex] = pixel.Alpha;//_backPixelBuffer[x];
+                        //p[pindex++] = pixel.Blue;
+                        //p[pindex++] = pixel.Green;
+                        //p[pindex++] = pixel.Red;
+                        //p[pindex] = pixel.Alpha;
+                        SKColor c = pixelTree.GetPixel(x + posx, y + posy, depth);
+                        SetPixel(x, y, c);
+                    }
                 }
             }
         }
@@ -74,8 +104,14 @@ namespace CanvasApp
         public void AddPoint(int x, int y)
         {
             points.Push(new Types.TouchPoint(x, y, SKTouchAction.Pressed));
-            lock (points)
-                Monitor.Pulse(points);
+            //lock (points)
+            //    Monitor.Pulse(points);
+            renlocker.Set();
+        }
+
+        public void NotifyRedraw()
+        {
+            renlocker.Set();
         }
         //--------------------------------------------------------------
 
@@ -84,21 +120,22 @@ namespace CanvasApp
 
         
 
-        Viewport()
+        public Viewport()
         {
             
         }
 
-        Viewport(int width, int height)
+        public Viewport(int width, int height)
         {
             Resize(width, height);
-            _self = this;
         }
 
         public void SetupRendererThread(SKCanvasView canvas)
         {
             this.canvas = canvas;
-            renderer = new Task(RendererMain);
+            _rndManRun = true;
+            renderer = new Thread(RendererMain);
+            renderer.Name = "RendererMan";
             renderer.Start();
             //SetupRendererSubThread(1);
         }
@@ -114,9 +151,8 @@ namespace CanvasApp
             this.width = width; this.height = height;
             buffer = new SKBitmap(width, height, SKColorType.Bgra8888, SKAlphaType.Premul);
             _pixels = buffer.GetPixels();
-            _backPixelBuffer = new byte[width * height * 4];
-            lock (points)
-                Monitor.Pulse(points);
+            _backPixelBuffer = new byte[width * 4, height];
+            renlocker.Set();
         }
 
         public void Resize(int width, int height)
@@ -127,7 +163,7 @@ namespace CanvasApp
             }
             else
             {
-                lock (buffer) _resize(width, height);
+                lock (this) _resize(width, height);
             }
         }
 
@@ -166,12 +202,25 @@ namespace CanvasApp
         {
             if (!CheckPos(x, y)) return;
 
-            int index = (y * width + x) * 4;
-            _backPixelBuffer[index++] = color.Blue;
-            _backPixelBuffer[index++] = color.Green;
-            _backPixelBuffer[index++] = color.Red;
-            _backPixelBuffer[index] = color.Alpha;
+            int index = x * 4;
+            _backPixelBuffer[index++,y] = color.Blue;
+            _backPixelBuffer[index++, y] = color.Green;
+            _backPixelBuffer[index++, y] = color.Red;
+            _backPixelBuffer[index, y] = color.Alpha;
 
+            //             int index = (y * width + x) * 4;
+            //             _backPixelBuffer[index++] = color.Blue;
+            //             _backPixelBuffer[index++] = color.Green;
+            //             _backPixelBuffer[index++] = color.Red;
+            //             _backPixelBuffer[index] = color.Alpha;
+
+        }
+
+        public void Dispose()
+        {
+            _rndManRun = false;
+            buffer.Dispose();
+            renlocker.Dispose();
         }
     }
 }
