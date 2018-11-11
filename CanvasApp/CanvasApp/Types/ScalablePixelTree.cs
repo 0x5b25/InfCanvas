@@ -8,6 +8,14 @@ namespace CanvasApp.Types
     class TreeDefs{
         public static readonly int ChunkWidth = 400;
         public static readonly int ChunkHeight = 400;
+
+        public static SKColor Pattern_ChessBord(int x,int y)
+        {
+            if (((x & (1 << 2)) ^ (y & (1 << 2))) == 0){
+                return SKColors.DarkGray;
+            }
+            return SKColors.Gray;
+        }
     }
 
     /*     
@@ -27,9 +35,21 @@ namespace CanvasApp.Types
         internal SKColor[,] _pixels /*= new SKColor[TreeDefs.ChunkWidth*TreeDefs.ChunkHeight]*/;
         internal ScalablePixelTreeNode tl, tr, bl, br;
         internal ScalablePixelTreeNode parent;
+        internal ScalablePixelTree tree;
         //internal int depth;
-        int _Xref(int depth) {  return (TreeDefs.ChunkWidth << depth) >> 3; }
-        int _Yref(int depth) { return (TreeDefs.ChunkHeight << depth) >> 3; }
+        //int _Xref(int depth) {  return (TreeDefs.ChunkWidth << depth) >> 3; }
+        //int _Yref(int depth) { return (TreeDefs.ChunkHeight << depth) >> 3; }
+        public ScalablePixelTreeNode(ScalablePixelTreeNode parent, ScalablePixelTree tree) { this.parent = parent; this.tree = tree; }
+        internal int xref, yref;
+        internal void SetRef(int xref, int yref)
+        {
+            this.xref = xref;this.yref = yref;
+            if (tr == null) return;
+            //tr.xref = tl.xref = br.xref = bl.xref = xref >> 1;
+            //tr.yref = tl.yref = br.yref = bl.yref = yref >> 1;
+            bl.SetRef(xref >> 1, yref >> 1); br.SetRef(xref >> 1, yref >> 1);
+            tl.SetRef(xref >> 1, yref >> 1); tr.SetRef(xref >> 1, yref >> 1);
+        }
 
         SKColor _GetPixelFromChild(int x, int y)
         {
@@ -74,29 +94,33 @@ namespace CanvasApp.Types
                 //Chunk 3
                 else { tx = x * 2 + TreeDefs.ChunkWidth / 2; n = bl; }
             }
-            return Aver(
+            if (n._pixels != null)
+                //Only get average value if child node doesnt have children
+                return Aver(
                 n._GetPixel(tx, ty, 1),
                 n._GetPixel(tx + 1, ty, 1),
                 n._GetPixel(tx, ty + 1, 1),
                 n._GetPixel(tx + 1, ty + 1, 1)
                 );
+            else return n._GetPixel(tx, ty, 1);
 
         }
         SKColor _GetPixelFromThis(int x, int y)
         {
             return _pixels[x + TreeDefs.ChunkWidth/2, y + TreeDefs.ChunkHeight/2];
         }
-        internal SKColor _GetPixel(int x, int y, int depth)
+        //Assume coordinates in full depth, depth is used to limit detail level
+        internal SKColor _GetPixel(int xglobal, int yglobal, int depth)
         {
             if (depth == 1)
             {
                 //Display chunk boundry check
 
-                if (x >= -TreeDefs.ChunkWidth / 2 && x < TreeDefs.ChunkWidth / 2 &&
-                    y >= -TreeDefs.ChunkHeight / 2 && y < TreeDefs.ChunkHeight / 2)
+                //if (xglobal >= -TreeDefs.ChunkWidth / 2 && xglobal < TreeDefs.ChunkWidth / 2 &&
+                //    yglobal >= -TreeDefs.ChunkHeight / 2 && yglobal < TreeDefs.ChunkHeight / 2)
                 {
-                    if (-x == TreeDefs.ChunkWidth / 2 || x == TreeDefs.ChunkWidth / 2 - 1 ||
-                        -y == TreeDefs.ChunkHeight / 2 || y == TreeDefs.ChunkHeight / 2 - 1)
+                    if (-xglobal == TreeDefs.ChunkWidth / 2 || xglobal == TreeDefs.ChunkWidth / 2 - 1 ||
+                        -yglobal == TreeDefs.ChunkHeight / 2 || yglobal == TreeDefs.ChunkHeight / 2 - 1)
                     {
                         if (_pixels != null)
                         {
@@ -106,45 +130,56 @@ namespace CanvasApp.Types
                             return SKColors.Green;
                         return SKColors.Red;
                     }
-                    if (_pixels == null) return _GetPixelFromChild(x, y);
-                    else return _GetPixelFromThis(x,y);
+                    if (_pixels == null)
+                    {
+                        return _GetPixelFromChild(xglobal, yglobal);
+                    }
+                    else return _GetPixelFromThis(xglobal, yglobal);
                 }
-                else return SKColors.Transparent;
+                //else return SKColors.Transparent;
 
             }
             else if(depth > 1)
             {
                 if (tr == null)
                 {
-                    while (depth > 1)
+                    xglobal >>= depth - 1;
+                    yglobal >>= depth - 1;
+                    /*while (depth > 1)
                     {
-                        x = x == -1 ? -1 : x / 2; y = y == -1 ? -1 : y / 2;
+                        xglobal = xglobal == -1 ? -1 : xglobal / 2; yglobal = yglobal == -1 ? -1 : yglobal / 2;
                         depth--;
-                    }
+                    }*/
                     if (_pixels != null)
                     {
-                        return _GetPixelFromThis(x, y);
+                        return _GetPixelFromThis(xglobal, yglobal);
                     }
                     else return SKColors.Gray;
                 }
 
-                int xref = _Xref(depth);
-                int yref = _Yref(depth);
+                //int xref = _Xref(depth);
+                //int yref = _Yref(depth);
 
-                if (x >= 0)
+                if (xglobal >= 0)
                 {
-                    if(y >= 0) return tr._GetPixel(x - xref, y - yref, depth - 1);
-                    else return br._GetPixel(x - xref, y + yref, depth - 1);
+                    if(yglobal >= 0) return tr._GetPixel(xglobal - xref, yglobal - yref, depth - 1);
+                    else return br._GetPixel(xglobal - xref, yglobal + yref, depth - 1);
                 }
                 else
                 {
-                    if (y >= 0) return tl._GetPixel(x + xref, y - yref, depth - 1);
-                    else return bl._GetPixel(x + xref, y + yref, depth - 1);
+                    if (yglobal >= 0) return tl._GetPixel(xglobal + xref, yglobal - yref, depth - 1);
+                    else return bl._GetPixel(xglobal + xref, yglobal + yref, depth - 1);
                 }
             }
 
             return SKColors.Transparent;
-            
+        }
+        //Assume coordinates in full depth, depth is used to limit detail level
+        internal SKColor _GetPixelNoTransparent(int xglobal, int yglobal, int depth)
+        {
+            SKColor c = _GetPixel(xglobal, yglobal, depth);
+            if (c == SKColors.Transparent || c == 0) return TreeDefs.Pattern_ChessBord(xglobal, yglobal);
+            return c;
         }
 
         void _SetPixelInChild(int x, int y, SKColor color)
@@ -164,63 +199,72 @@ namespace CanvasApp.Types
                 if (y >= 0) { n = tl; ycoord = y * 2 - TreeDefs.ChunkHeight / 2; }
                 else { n = bl; ycoord = y * 2 + TreeDefs.ChunkHeight / 2; }
             }
-            n._SetPixel(xcoord, ycoord, 1, color);
-            n._SetPixel(xcoord + 1, ycoord, 1, color);
-            n._SetPixel(xcoord, ycoord + 1, 1, color);
-            n._SetPixel(xcoord + 1, ycoord + 1, 1, color);
+            n._SetPixel(xcoord, ycoord, 1,1, color);
+            n._SetPixel(xcoord + 1, ycoord, 1, 1, color);
+            n._SetPixel(xcoord, ycoord + 1, 1, 1, color);
+            n._SetPixel(xcoord + 1, ycoord + 1, 1, 1, color);
             return;
         }
         void _SetPixelInThis(int x, int y, SKColor color)
         {
             _pixels[x + TreeDefs.ChunkWidth/2, y + TreeDefs.ChunkHeight/2] = color;
         }
-        internal void _SetPixel(int x, int y, int depth, SKColor color)
+        /// <summary>
+        /// Set the pixel in specific level of detail
+        /// </summary>
+        /// <param name="xglobal">global x coord</param>
+        /// <param name="yglobal">global y coord</param>
+        /// <param name="totalDepth">total depth the tree has</param>
+        /// <param name="lod">target lod, make sure lod is nor less than totaldepth</param>
+        /// <param name="color"></param>
+        internal void _SetPixel(int xglobal, int yglobal, int totalDepth, int lod, SKColor color)
         {
-            if (depth == 1)
+            if (lod == 1)
             {
-                if (x >= -TreeDefs.ChunkWidth / 2 && x < TreeDefs.ChunkWidth / 2 &&
-                    y >= -TreeDefs.ChunkHeight / 2 && y < TreeDefs.ChunkHeight / 2)
+                xglobal >>= totalDepth - 1;yglobal >>= totalDepth - 1;
+                //if (xglobal >= -TreeDefs.ChunkWidth / 2 && xglobal < TreeDefs.ChunkWidth / 2 &&
+                //    yglobal >= -TreeDefs.ChunkHeight / 2 && yglobal < TreeDefs.ChunkHeight / 2)
                 {
                     if (tl != null)
                     {
-                        _SetPixelInChild(x, y, color);
+                        _SetPixelInChild(xglobal, yglobal, color);
                         return;
                     }
                     if (_pixels == null)
                     {
                         _pixels = new SKColor[TreeDefs.ChunkWidth , TreeDefs.ChunkHeight];
                     }
-                    _SetPixelInThis(x, y, color);
+                    _SetPixelInThis(xglobal, yglobal, color);
                     return;
                 }
             }
-            else if (depth > 1)
+            else if (lod > 1)
             {
                 ScalablePixelTreeNode n;
                 int xcoord, ycoord;
                 bool t = false, r = false;
                 //int scaleFactor = depth - 1;
-                int xref = _Xref(depth);
-                int yref = _Yref(depth);
-                if (x >= 0)
+                //int xref = _Xref(depth);
+                //int yref = _Yref(depth);
+                if (xglobal >= 0)
                 {
                     r = true;
-                    xcoord = x - xref;
-                    if (y >= 0) { t = true; n = tr; ycoord = y - yref; }
-                    else { n = br; ycoord = y + yref; }
+                    xcoord = xglobal - xref;
+                    if (yglobal >= 0) { t = true; n = tr; ycoord = yglobal - yref; }
+                    else { n = br; ycoord = yglobal + yref; }
                 }
                 else
                 {
-                    xcoord = x + xref;
-                    if (y >= 0) {  n = tl; ycoord = y - yref; }
-                    else { n = bl; ycoord = y + yref; }
+                    xcoord = xglobal + xref;
+                    if (yglobal >= 0) {  n = tl; ycoord = yglobal - yref; }
+                    else { n = bl; ycoord = yglobal + yref; }
                 }
                 if (n == null)
                 {
-                    tl = new ScalablePixelTreeNode() { parent = this };
-                    tr = new ScalablePixelTreeNode() { parent = this };
-                    bl = new ScalablePixelTreeNode() { parent = this };
-                    br = new ScalablePixelTreeNode() { parent = this };
+                    tl = new ScalablePixelTreeNode(this, tree) { xref = this.xref >> 1, yref = this.yref >> 1};
+                    tr = new ScalablePixelTreeNode(this,tree){ xref = this.xref >> 1, yref = this.yref >> 1};
+                    bl = new ScalablePixelTreeNode(this,tree){ xref = this.xref >> 1, yref = this.yref >> 1};
+                    br = new ScalablePixelTreeNode(this,tree) { xref = this.xref >> 1, yref = this.yref >> 1 };
                     if (t) { if (r) n = tr; else n = tl; }
                     else { if (r) n = br; else n = bl; }
                     if (_pixels != null)
@@ -231,15 +275,16 @@ namespace CanvasApp.Types
                         dst[1] = new SKColor[TreeDefs.ChunkWidth , TreeDefs.ChunkHeight];
                         dst[2] = new SKColor[TreeDefs.ChunkWidth , TreeDefs.ChunkHeight];
                         dst[3] = new SKColor[TreeDefs.ChunkWidth , TreeDefs.ChunkHeight];
-
+                        
                         //Slice this node
                         Utilities.ParallelJobManager.Get().DoJob((int index, int num) => { SliceAndScaleUp(index, num, dst); });
                         tr._pixels = dst[0]; tl._pixels = dst[1];
                         br._pixels = dst[2]; bl._pixels = dst[3];
                         _pixels = null;
+                        //tree.totalDepth++;
                     }
                 }
-                n._SetPixel(xcoord, ycoord, depth - 1, color);
+                n._SetPixel(xcoord, ycoord, totalDepth - 1,lod - 1, color);
             }
         }
 
@@ -355,15 +400,14 @@ namespace CanvasApp.Types
                 }
             }
         }
-        public void Subdivide()
+        public void SubdivideNoScale()
         {
             if (_pixels == null) return;
 
-            tl = new ScalablePixelTreeNode() { parent = this };
-            tr = new ScalablePixelTreeNode() { parent = this };
-            bl = new ScalablePixelTreeNode() { parent = this };
-            br = new ScalablePixelTreeNode() { parent = this };
-
+            tl = new ScalablePixelTreeNode(this, tree);//{ parent = this, xref = this.xref, yref = this.yref };
+            tr = new ScalablePixelTreeNode(this, tree);//{ parent = this, xref = this.xref, yref = this.yref };
+            bl = new ScalablePixelTreeNode(this, tree);//{ parent = this, xref = this.xref, yref = this.yref };
+            br = new ScalablePixelTreeNode(this, tree);//{ parent = this, xref = this.xref, yref = this.yref };
             //Create new chunks
             SKColor[][,] dst = new SKColor[4][,];
             dst[0] = new SKColor[TreeDefs.ChunkWidth, TreeDefs.ChunkHeight];
@@ -376,26 +420,31 @@ namespace CanvasApp.Types
             tr._pixels = dst[0]; tl._pixels = dst[1];
             br._pixels = dst[2]; bl._pixels = dst[3];
             _pixels = null;
-
         }
     }
 
     class ScalablePixelTree
     {
         ScalablePixelTreeNode root;
-        int totalDepth = 0;
+        internal int totalDepth = 0;
 
         public SKColor GetPixel(int x, int y, int depth)
         {
-            if (root != null) return root._GetPixel(x, y, depth);
-            return SKColors.Transparent;
+            ScaleCoord(ref x, ref y, depth);
+            if (root == null ||
+                x < -root.xref << 1 || x >= root.xref << 1 ||
+                y < -root.yref << 1 || y >= root.yref << 1)
+            {
+                return TreeDefs.Pattern_ChessBord(x, y);
+            }
+            return root._GetPixelNoTransparent(x, y, totalDepth);
         }
 
         public int SetPixel(int x, int y, int depth, SKColor color)
         {
             if (root == null)
             {
-                root = new ScalablePixelTreeNode();
+                root = new ScalablePixelTreeNode(null, this) { xref = TreeDefs.ChunkWidth >> 2, yref = TreeDefs.ChunkHeight >> 2 };
                 totalDepth++;
             }
             if (depth <= 0)
@@ -403,33 +452,46 @@ namespace CanvasApp.Types
                 AddDepth(-depth + 1);
                 depth = 1;
             }
+            else if(depth > totalDepth)
+            {
+                //Just bump up totalDepth and reference points
+                totalDepth = depth;
+                root.SetRef((TreeDefs.ChunkWidth << totalDepth) >>3, (TreeDefs.ChunkHeight << totalDepth) >> 3);
+            }
+
+            ScaleCoord(ref x, ref y, depth);
+
             //evaluate boundary
-            int w = depth >= 2 ? TreeDefs.ChunkWidth << (depth - 2) : TreeDefs.ChunkWidth >> 1;
-            int h = depth >= 2 ? TreeDefs.ChunkHeight << (depth - 2) : TreeDefs.ChunkHeight >> 1;
+            //if (x < -root.xref << 1 || x >= root.xref << 1 ||
+            //    y < -root.yref << 1 || y >= root.yref << 1) return 0;
+            //Check whether depth is adequate
+            int w = root.xref * 2;
+            int h = root.yref * 2;
             //additional depth needed
             int reqDepth = 0;
             if (x >= w )
             {
-                reqDepth = Utilities.Mathi.Log2(x *2 / TreeDefs.ChunkWidth) - depth + 1;
+                //Log2(x / (root.xref * 2)) - depth + 1
+                reqDepth = Utilities.Mathi.Log2(x / root.xref) - 1;
                 //out of bounds
             }
             else if(x < -w)
             {
-                reqDepth = Utilities.Mathi.Log2(-x * 2 / TreeDefs.ChunkWidth  ) - depth + 1;
+                reqDepth = Utilities.Mathi.Log2(-x / root.xref) - 1;
             }
-            if (y > h)
+            if (y >= h)
             {
-                int r = Utilities.Mathi.Log2(y * 2 / TreeDefs.ChunkHeight  ) - depth + 1;
+                int r = Utilities.Mathi.Log2(y / root.xref) - 1;
                 reqDepth = r > reqDepth ? r : reqDepth;
             }
             else if (y < -h)
             {
-                int r = Utilities.Mathi.Log2(-y * 2 / TreeDefs.ChunkHeight  ) - depth + 1;
+                int r = Utilities.Mathi.Log2(-y / root.xref) - 1;
                 reqDepth = r > reqDepth ? r : reqDepth;
             }
             //Slice root and add height
             AddDepth(reqDepth);
-            root._SetPixel(x, y, depth + reqDepth, color);
+            root._SetPixel(x, y, totalDepth,depth + reqDepth, color);
 
             //Return depth added
             return reqDepth;
@@ -443,12 +505,13 @@ namespace CanvasApp.Types
             {
                 void Assign(ScalablePixelTreeNode target, ScalablePixelTreeNode pre, int prePos)
                 {
+
                     if (pre == null)
                     {
-                        target.tl = new ScalablePixelTreeNode() { parent = target };
-                        target.tr = new ScalablePixelTreeNode() { parent = target };
-                        target.bl = new ScalablePixelTreeNode() { parent = target };
-                        target.br = new ScalablePixelTreeNode() { parent = target };
+                        target.tl = new ScalablePixelTreeNode(target, this);
+                        target.tr = new ScalablePixelTreeNode(target, this);
+                        target.bl = new ScalablePixelTreeNode(target,this);
+                        target.br = new ScalablePixelTreeNode(target,this);
                     }
                     else
                     {
@@ -457,53 +520,55 @@ namespace CanvasApp.Types
                             case 0:
                                 {
                                     target.tl = pre;
-                                    target.tr = new ScalablePixelTreeNode() { parent = target };
-                                    target.bl = new ScalablePixelTreeNode() { parent = target };
-                                    target.br = new ScalablePixelTreeNode() { parent = target };
+                                    target.tr = new ScalablePixelTreeNode(target, this);
+                                    target.bl = new ScalablePixelTreeNode(target,this);
+                                    target.br = new ScalablePixelTreeNode(target,this);
                                 }
                                 break;
 
                             case 1:
                                 {
-                                    target.tl = new ScalablePixelTreeNode() { parent = target };
+                                    target.tl = new ScalablePixelTreeNode(target, this);
                                     target.tr = pre;
-                                    target.bl = new ScalablePixelTreeNode() { parent = target };
-                                    target.br = new ScalablePixelTreeNode() { parent = target };
+                                    target.bl = new ScalablePixelTreeNode(target, this);
+                                    target.br = new ScalablePixelTreeNode(target,this);
                                 }
                                 break;
 
                             case 2:
                                 {
-                                    target.tl = new ScalablePixelTreeNode() { parent = target };
-                                    target.tr = new ScalablePixelTreeNode() { parent = target };
+                                    target.tl = new ScalablePixelTreeNode(target, this);
+                                    target.tr = new ScalablePixelTreeNode(target,this);
                                     target.bl = pre;
-                                    target.br = new ScalablePixelTreeNode() { parent = target };
+                                    target.br = new ScalablePixelTreeNode(target, this);
                                 }
                                 break;
 
                             case 3:
                                 {
-                                    target.tl = new ScalablePixelTreeNode() { parent = target };
-                                    target.tr = new ScalablePixelTreeNode() { parent = target };
-                                    target.bl = new ScalablePixelTreeNode() { parent = target };
+                                    target.tl = new ScalablePixelTreeNode(target, this);
+                                    target.tr = new ScalablePixelTreeNode(target,this);
+                                    target.bl = new ScalablePixelTreeNode(target,this);
                                     target.br = pre;
 
                                 }
                                 break;
                         }
-                        pre.parent = target;
+                        pre.parent = target;pre.tree = this;
                     }
                 }
 
                 if (root._pixels != null)
                 {
                     //need slicing
-                    root.Subdivide();
+                    root.SubdivideNoScale();
                     totalDepth++;
                 }
                 else
                 {
-                    ScalablePixelTreeNode n = new ScalablePixelTreeNode();
+                    ScalablePixelTreeNode n = new ScalablePixelTreeNode(null,this);
+                    //Calculate ref points based on depth
+                    totalDepth++;
                     Assign(n, null, 0);
                     if (root.tr != null)
                     {
@@ -518,10 +583,27 @@ namespace CanvasApp.Types
                         Assign(n.br, root.br, 0);
                     }
                     root = n;
-                    totalDepth++;
+                    
                 }
+                root.SetRef((TreeDefs.ChunkWidth << totalDepth) >> 3, (TreeDefs.ChunkHeight << totalDepth) >> 3);
             }
             if (d > 1) AddDepth(d - 1);
+        }
+
+        void ScaleCoord(ref int originalX, ref int originalY, int originalDepth)
+        {
+            if (originalDepth < totalDepth)
+            {
+                //below max depth, scale up
+                originalX <<= (totalDepth - originalDepth);
+                originalY <<= (totalDepth - originalDepth);
+            }
+            if (originalDepth > totalDepth)
+            {
+                // over max depth, scale down
+                originalX >>= (originalDepth - totalDepth);
+                originalY >>= (originalDepth - totalDepth);
+            }
         }
     }
 

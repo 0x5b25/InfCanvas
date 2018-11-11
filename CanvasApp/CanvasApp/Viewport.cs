@@ -24,7 +24,7 @@ namespace CanvasApp
 
         //------------------Test contents-------------------------------
         byte[,] _backPixelBuffer;
-        Types.ScalablePixelTree pixelTree = new Types.ScalablePixelTree();
+        public Types.ScalablePixelTree pixelTree = new Types.ScalablePixelTree();
         Utilities.Queue<Types.TouchPoint> points = new Utilities.Queue<Types.TouchPoint>();
         Thread renderer;
         ManualResetEventSlim renlocker = new ManualResetEventSlim(false);
@@ -35,6 +35,10 @@ namespace CanvasApp
             while (true)
             {
                 renlocker.Wait();
+               
+                if (points.GetDepth() <= 0)
+                    renlocker.Reset();
+
                 if (!_rndManRun) break;
                 while (points.GetDepth() > 0)
                 {
@@ -48,12 +52,12 @@ namespace CanvasApp
                     }
                 }
                 //Render viewport
-
-                Utilities.ParallelJobManager.Get().DoJob(FillFromPixelTree);
+                lock (this)
+                    //Lock viewport during rendering
+                    Utilities.ParallelJobManager.Get().DoJob(FillFromPixelTree);
                 //issue redraw
                 Device.BeginInvokeOnMainThread(() => {canvas?.InvalidateSurface();});
-                if (points.GetDepth() <= 0)
-                    renlocker.Reset();
+
             }
         }
 
@@ -154,7 +158,7 @@ namespace CanvasApp
             }
             else
             {
-                lock (buffer) _resize(width, height);
+                lock (this) _resize(width, height);
             }
         }
 

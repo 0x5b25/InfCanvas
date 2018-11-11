@@ -50,12 +50,17 @@ namespace CanvasApp
             AbsoluteLayout l = new AbsoluteLayout();
             this.Content = l;
 
+            AbsoluteLayout.SetLayoutBounds(canvas, new Rectangle(0.5, 0.5, 1, 1));
+            AbsoluteLayout.SetLayoutFlags(canvas, AbsoluteLayoutFlags.All);
+            l.Children.Add(canvas);
+            vp.SetupRendererThread(canvas);
+
             info = new Label
             {
                 FontSize = 10,
                 Text = "I_1"
             };
-            AbsoluteLayout.SetLayoutBounds(info, new Rectangle(0, 0, 1, 20));
+            AbsoluteLayout.SetLayoutBounds(info, new Rectangle(0, 0, 0.5, 15));
             AbsoluteLayout.SetLayoutFlags(info, AbsoluteLayoutFlags.WidthProportional);
             l.Children.Add(info);
 
@@ -65,7 +70,7 @@ namespace CanvasApp
                 FontSize = 10,
                 Text = "I_2"
             };
-            AbsoluteLayout.SetLayoutBounds(info2, new Rectangle(0, 20, 1, 20));
+            AbsoluteLayout.SetLayoutBounds(info2, new Rectangle(0, 15, 0.5, 15));
             AbsoluteLayout.SetLayoutFlags(info2, AbsoluteLayoutFlags.WidthProportional);
             l.Children.Add(info2);
 
@@ -74,7 +79,7 @@ namespace CanvasApp
                 FontSize = 10,
                 Text = "I_3"
             };
-            AbsoluteLayout.SetLayoutBounds(info3, new Rectangle(0, 40, 1, 20));
+            AbsoluteLayout.SetLayoutBounds(info3, new Rectangle(0, 30, 0.5, 15));
             AbsoluteLayout.SetLayoutFlags(info3, AbsoluteLayoutFlags.WidthProportional);
             l.Children.Add(info3);
 
@@ -83,14 +88,11 @@ namespace CanvasApp
                 FontSize = 10,
                 Text = "I_4"
             };
-            AbsoluteLayout.SetLayoutBounds(info4, new Rectangle(0, 60, 1, 20));
+            AbsoluteLayout.SetLayoutBounds(info4, new Rectangle(0, 45, 0.5, 15));
             AbsoluteLayout.SetLayoutFlags(info4, AbsoluteLayoutFlags.WidthProportional);
             l.Children.Add(info4);
 
-            AbsoluteLayout.SetLayoutBounds(canvas, new Rectangle(0.5, 0.5, 1, 1));
-            AbsoluteLayout.SetLayoutFlags(canvas, AbsoluteLayoutFlags.All);
-            l.Children.Add(canvas);
-            vp.SetupRendererThread(canvas);
+
 
             b = new Button
             {
@@ -127,7 +129,7 @@ namespace CanvasApp
             }
             if(info4 != null)
             {
-                info4.Text = "vp.depth:" + vp.depth;
+                info4.Text = "vp.dp:" + vp.depth + " tree.dp:" + vp.pixelTree.totalDepth;
             }
             if (e.MouseButton == SKMouseButton.Left||
                 e.ActionType == SKTouchAction.Pressed||

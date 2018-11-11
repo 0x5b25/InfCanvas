@@ -7,7 +7,7 @@ namespace CanvasApp.Utilities
 {
     class JobManDefs
     {
-        public static readonly int workerNum = 4; 
+        public static readonly int workerNum = 2; 
     }
 
     class ParallelJobManager:IDisposable
