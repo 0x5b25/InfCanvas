@@ -442,6 +442,7 @@ namespace CanvasApp.Types
 
         public int SetPixel(int x, int y, int depth, SKColor color)
         {
+            int depthChanged = 0;
             if (root == null)
             {
                 root = new ScalablePixelTreeNode(null, this) { xref = TreeDefs.ChunkWidth >> 2, yref = TreeDefs.ChunkHeight >> 2 };
@@ -449,8 +450,12 @@ namespace CanvasApp.Types
             }
             if (depth <= 0)
             {
+                //Exceeding maximum height, need to "push down" viewport
                 AddDepth(-depth + 1);
+                //So the 'depthChanged' is required to record push down levels
+                depthChanged = -depth + 1;
                 depth = 1;
+
             }
             else if(depth > totalDepth)
             {
@@ -494,7 +499,7 @@ namespace CanvasApp.Types
             root._SetPixel(x, y, totalDepth,depth + reqDepth, color);
 
             //Return depth added
-            return reqDepth;
+            return depthChanged+reqDepth;
         }
 
         void AddDepth(int d)

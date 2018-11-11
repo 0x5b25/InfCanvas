@@ -16,7 +16,7 @@ namespace CanvasApp
         Viewport vp;
 
         Label info,info2,info3,info4;
-        Button b, b2, b3, b4;
+        Button b, b2, b3, b4, b5, b6;
 
         public MainPage()
         {
@@ -98,7 +98,7 @@ namespace CanvasApp
             {
                 Text = "+"
             };
-            b.Pressed += (object sender,EventArgs e) => { if(vp.depth <= 6) vp.depth++; };
+            b.Pressed += (object sender,EventArgs e) => { if(vp.depth <= vp.pixelTree.totalDepth) vp.depth++;vp.NotifyRedraw(); };
             AbsoluteLayout.SetLayoutBounds(b, new Rectangle(0, 60, 40, 40));
             AbsoluteLayout.SetLayoutFlags(b, AbsoluteLayoutFlags.None);
             l.Children.Add(b);
@@ -107,18 +107,58 @@ namespace CanvasApp
             {
                 Text = "-"
             };
-            b2.Pressed += (object sender, EventArgs e) => { if (vp.depth > 0) vp.depth--; };
+            b2.Pressed += (object sender, EventArgs e) => { if (vp.depth > 0) vp.depth--; vp.NotifyRedraw(); };
             AbsoluteLayout.SetLayoutBounds(b2, new Rectangle(40, 60, 40, 40));
             AbsoluteLayout.SetLayoutFlags(b2, AbsoluteLayoutFlags.None);
             l.Children.Add(b2);
 
-            
+            var moveSensitivity = 8;
+
+            b3 = new Button
+            {
+                Text = "/\\"
+            };
+            b3.Pressed += (object sender, EventArgs e) => { vp.posy-= moveSensitivity; vp.NotifyRedraw(); };
+            AbsoluteLayout.SetLayoutBounds(b3, new Rectangle(120, 60, 40, 40));
+            AbsoluteLayout.SetLayoutFlags(b3, AbsoluteLayoutFlags.None);
+            l.Children.Add(b3);
+
+            b4 = new Button
+            {
+                Text = "<"
+            };
+            b4.Pressed += (object sender, EventArgs e) => { vp.posx-= moveSensitivity; vp.NotifyRedraw(); };
+            AbsoluteLayout.SetLayoutBounds(b4, new Rectangle(80, 100, 40, 40));
+            AbsoluteLayout.SetLayoutFlags(b4, AbsoluteLayoutFlags.None);
+            l.Children.Add(b4);
+
+            b5 = new Button
+            {
+                Text = "\\/"
+            };
+            b5.Pressed += (object sender, EventArgs e) => { vp.posy+= moveSensitivity; vp.NotifyRedraw(); };
+            AbsoluteLayout.SetLayoutBounds(b5, new Rectangle(120, 100, 40, 40));
+            AbsoluteLayout.SetLayoutFlags(b5, AbsoluteLayoutFlags.None);
+            l.Children.Add(b5);
+
+            b6 = new Button
+            {
+                Text = ">"
+            };
+            b6.Pressed += (object sender, EventArgs e) => { vp.posx += moveSensitivity; vp.NotifyRedraw(); };
+            AbsoluteLayout.SetLayoutBounds(b6, new Rectangle(160, 100, 40, 40));
+            AbsoluteLayout.SetLayoutFlags(b6, AbsoluteLayoutFlags.None);
+            l.Children.Add(b6);
             //vp.Resize((int)canvas.CanvasSize.Width, (int)canvas.CanvasSize.Height);
             //RefreshBufferRes();
         }
 
         private void Canvas_Touch(object sender, SKTouchEventArgs e)
         {
+            if (scaleX == 0 || scaleY == 0)
+            {
+                GetScreenInfo();
+            }
             info.Text = "C:" + canvas.CanvasSize + " X:" + scaleX + "Y:" + scaleY;
             if (info2 != null) {
                 info2.Text = "Position:" + e.Location;
@@ -127,18 +167,18 @@ namespace CanvasApp
             {
                 info3.Text = "Type:" + e.ActionType +" Contact:"+ e.InContact;
             }
-            if(info4 != null)
-            {
-                info4.Text = "vp.dp:" + vp.depth + " tree.dp:" + vp.pixelTree.totalDepth;
-            }
+            
             if (e.MouseButton == SKMouseButton.Left||
                 e.ActionType == SKTouchAction.Pressed||
                 e.ActionType == SKTouchAction.Moved)
             {
                 //vp.SetPixelBack(Convert.ToInt32(e.Location.X), Convert.ToInt32(e.Location.Y), SKColors.Red);
                 //canvas.InvalidateSurface();
-                if(e.InContact)
-                vp.AddPoint(Convert.ToInt32(e.Location.X/scaleX), Convert.ToInt32(e.Location.Y/scaleY));
+                if (e.InContact)
+                {
+                    
+                    vp.AddPoint(Convert.ToInt32(e.Location.X / scaleX), Convert.ToInt32(e.Location.Y / scaleY));
+                }
             }
 
             // let the OS know we are interested
@@ -149,11 +189,16 @@ namespace CanvasApp
         {
             //May get called for the first time when canvas is added to layout tree,
             //So we initalize viewport buffer and set up correct scale
+            if (info4 != null)
+            {
+                info4.Text = "vp.dp:" + vp.depth + " tree.dp:" + vp.pixelTree.totalDepth;
+            }
             if (vp.buffer == null)
                 RefreshBufferRes();
             //vp.Resize((int)canvas.CanvasSize.Width, (int)canvas.CanvasSize.Height);
-            
-            args.Surface.Canvas.DrawBitmap(vp.buffer,bmpRect);
+
+            args.Surface.Canvas.DrawBitmap(vp.buffer, bmpRect);
+
         }
 
         private void ChangeContent(object sender, EventArgs e)
@@ -171,17 +216,24 @@ namespace CanvasApp
 
         float scaleX = 1, scaleY = 1;
         SKRect bmpRect = new SKRect();
-        void RefreshBufferRes()
+
+        private void GetScreenInfo()
         {
-            //if (canvas == null) return;
             scaleX = (float)(canvas.CanvasSize.Width / Width);
             scaleY = (float)(canvas.CanvasSize.Height / Height);
             bmpRect.Left = 0;
             bmpRect.Top = 0;
             bmpRect.Size = canvas.CanvasSize;
+        }
+
+        void RefreshBufferRes()
+        {
+            //if (canvas == null) return;
+            GetScreenInfo();
+
             //vp.Resize((int)canvas.CanvasSize.Width, (int)canvas.CanvasSize.Height);
             vp.Resize((int)this.Width, (int)this.Height);
-            //if(info != null)
+                //if(info != null)
         }
 
         protected override bool OnBackButtonPressed()

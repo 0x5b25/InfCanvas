@@ -108,6 +108,11 @@ namespace CanvasApp
             //    Monitor.Pulse(points);
             renlocker.Set();
         }
+
+        public void NotifyRedraw()
+        {
+            renlocker.Set();
+        }
         //--------------------------------------------------------------
 
         public int width = 0;//{ get { if (buffer == null) return 0; else return (int)buffer.Width; } }
